@@ -60,6 +60,9 @@ using System.Linq;
 using Color = System.Drawing.Color;
 using System.Collections.Specialized;
 using System.Reflection;
+using System.Resources;
+using System.Globalization;
+using Microsoft.Toolkit.Uwp.Notifications;
 using ThermoFisher.CommonCore.Data.Business;
 using ThermoFisher.CommonCore.Data.Interfaces;
 using ThermoFisher.CommonCore.RawFileReader;
@@ -80,9 +83,26 @@ namespace MassSpecTrigger
         [Option('d', "debug", Required = false, HelpText = "Enable debug output")]
         public bool Debug { get; set; }
 
+        [Option('v', "version", Required = false, HelpText = "Show version and exit")]
+        public bool Version { get; set; }
+
         [Value(0, MetaName = "\"file_path.raw\"", HelpText = "RAW file (complete path)")]
         public string InputRawFile { get; set; } 
     }
+
+    // [AttributeUsage(AttributeTargets.Assembly)]
+    // internal class BuildDateAttribute : Attribute
+    // {
+    //     public BuildDateAttribute(string value)
+    //     {
+    //         DateTime = DateTime.ParseExact(
+    //             value, "yyyyMMddHHmmss",
+    //             CultureInfo.InvariantCulture,
+    //             DateTimeStyles.None);
+    //     }
+    //
+    //     public DateTime DateTime { get; }
+    // }
 
     // to avoid most casting
     public class StringKeyDictionary : OrderedDictionary, IEnumerable<KeyValuePair<string, object>>
@@ -225,6 +245,7 @@ namespace MassSpecTrigger
         public const string OutputDirKey = "Output_Directory";
         public const string RepeatRunKey = "Repeat_Run_Matches";
         public const string TokenFileKey = "Token_File";
+        public const string FailureTokenFileKey = "Failure_Token_File";
         public const string SourceTrimKey = "Source_Trim";
         public const string SldStartsWithKey = "SLD_Starts_With";
         public const string PostBlankMatchesKey = "PostBlank_Matches";
@@ -241,6 +262,7 @@ namespace MassSpecTrigger
         public static string DefaultSourceTrim = "Transfer";
         public static string DefaultRepeatRun = "_RPT";
         public static string DefaultTokenFile = "MSAComplete.txt";
+        public static string DefaultFailureTokenFile = "MSAFailure.txt";
         public static string DefaultSldStartsWith = "Exploris";
         public static string DefaultPostBlankMatches = "PostBlank";
         public static bool DefaultIgnorePostBlank = true;
@@ -253,6 +275,7 @@ namespace MassSpecTrigger
         public static string SourceTrim = DefaultSourceTrim;
         public static string RepeatRun = DefaultRepeatRun;
         public static string TokenFile = DefaultTokenFile;
+        public static string FailureTokenFile = DefaultFailureTokenFile;
         public static string SldStartsWith = DefaultSldStartsWith;
         public static string PostBlankMatches = DefaultPostBlankMatches;
         public static bool IgnorePostBlank = DefaultIgnorePostBlank;
@@ -272,6 +295,7 @@ namespace MassSpecTrigger
         public static string rawFileName = "";
         public static string logFilePath = "";
         public static List<string> mockSequence = new List<string>();
+        public static List<string> tempDirectories = new List<string>();
 
         public static Parser parser;
         public static ParserResult<Options> parserResult;
@@ -360,12 +384,28 @@ namespace MassSpecTrigger
 
         public static string Timestamp() => Timestamp("yyyy-MM-dd HH:mm:ss");
 
+        // public static DateTime GetBuildDate(Assembly assembly)
+        // {
+        //     var attribute = assembly.GetCustomAttribute<BuildDateAttribute>();
+        //     return attribute?.DateTime ?? default(DateTime);
+        //     // ResourceManager rm = new ResourceManager("Strings", typeof(MainClass).Assembly);
+        //     // string buildTimestamp = rm.GetString("BuildTimestamp");
+        // }
+
+        public static string GetBuildTimestamp()
+        {
+            // var utcBuildTime = GetBuildDate(Assembly.GetExecutingAssembly());
+            var buildTime = File.GetLastWriteTime(Assembly.GetExecutingAssembly().Location);
+            // Console.WriteLine($"buildTime: {buildTime}");
+            return buildTime.ToString("yyyy-MM-ddTHH:mm:sszzz");
+        }
+
         public static bool IsTempSldFile(string filepath)
         {
             string filename = Path.GetFileName(filepath);
             Regex tempSldRegex = new Regex(@"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.sld$", RegexOptions.IgnoreCase);
             return tempSldRegex.IsMatch(filename);
-        }
+        } // IsTempSldFile()
         
         public static string ConstructDestinationPath(string sourceDir, string outputDir, string sourceTrimPath = "")
         {
@@ -400,10 +440,29 @@ namespace MassSpecTrigger
             return newOutputPath;
         }
 
+        public static bool CreateOutputDirectory(string outputPath)
+        {
+            if (!string.IsNullOrEmpty(outputPath))
+            {
+                if (!Directory.Exists(outputPath))
+                {
+                    Directory.CreateDirectory(outputPath);
+                }
+                return true;
+            }
+            else
+            {
+                logerr($"CreateOutputDirectory called with empty path");
+            }
+
+            return false;
+        } // CreateOutputDirectory()
+
         public static bool PrepareOutputDirectory(string outputPath, int minRawFileSize, string filePattern)
         {
             if (!string.IsNullOrEmpty(outputPath))
             {
+                CreateOutputDirectory(outputPath);
                 if (!Directory.Exists(outputPath))
                 {
                     Directory.CreateDirectory(outputPath);
@@ -416,11 +475,12 @@ namespace MassSpecTrigger
                 {
                     log("Found existing small raw files, previous copy may have been interrupted. Deleting " + outputPath);
                     Directory.Delete(outputPath, true);
+                    CreateOutputDirectory(outputPath);
                 }
                 return true;
             }
             return false;
-        }
+        } // PrepareOutputDirectory()
 
         public static StringOrderedDictionary ReadConfigFile(string execPath)
         {
@@ -459,7 +519,7 @@ namespace MassSpecTrigger
                 }
             }
             return configMap;
-        }
+        } // ReadConfigFile()
         
         public static StringKeyDictionary ReadAndParseConfigFile(string execPath)
         {
@@ -481,7 +541,7 @@ namespace MassSpecTrigger
                 configMap.Add(de.Key, (string)de.Value);
             }
             return configMap;
-        }
+        } // ReadAndParseConfigFile()
 
         public static void CopyDirectory(string sourceDir, string destDir, bool updateFiles)
         {
@@ -501,7 +561,7 @@ namespace MassSpecTrigger
                 string destSubDir = Path.Combine(destDir, dirName);
                 CopyDirectory(subDir, destSubDir, updateFiles);
             }
-        }
+        } // CopyDirectory()
 
         public static void RecursiveRemoveFiles(string sourceDir, bool removeFiles = false, bool removeDirectories = false, bool preserveSld = true, StreamWriter logger = null)
         {
@@ -562,7 +622,62 @@ namespace MassSpecTrigger
                     logdbg($"Removed base directory: {sourceDirectory.FullName}", logger);
                 }
             }
-        }
+        } // RecursiveRemoveFiles()
+
+        private static string CreateSLDTempDirectory()
+        {
+            var tempDir = Directory.CreateTempSubdirectory("sld-copy-");
+            var tempDirPath = tempDir.FullName;
+            tempDirectories.Add(tempDirPath);
+            log($"Temp directory created: '{tempDirPath}'");
+            return tempDirPath;
+        } // CreateSLDTempDirectory()
+
+        private static void DeleteTempDirectories()
+        {
+            var tempDir = Path.GetTempPath();
+            foreach (var tempDirPath in tempDirectories)
+            {
+                // Verify this is really a temp directory before recursively deleting it
+                if (ContainsCaseInsensitiveSubstring(tempDirPath, tempDir) && Path.Exists(tempDirPath))
+                {
+                    log($"Deleting temp directory: '{tempDirPath}'");
+                    Directory.Delete(tempDirPath, true);
+                }
+            }
+        } // CreateSLDTempDirectory()
+
+        private static ISequenceFileAccess ReadContentsOfSLDFile(string sldFilePath)
+        {
+            // Creates a copy of the SLD file in a temp directory before reading it
+            var sldTempDir = CreateSLDTempDirectory();
+            var sldFileName = Path.GetFileName(sldFilePath);
+            var sldFileCopy = Path.Combine(sldTempDir, sldFileName);
+            log($"Copying temp copy of SLD file: '{sldFilePath}' => '{sldFileCopy}'");
+            File.Copy(sldFilePath, sldFileCopy);
+            if (Path.Exists(sldFileCopy))
+            {
+                log($"Temporary SLD file created: '{sldFileCopy}'");
+                var sldFile = SequenceFileReaderFactory.ReadFile(sldFileCopy);
+                if (sldFile is null || sldFile.IsError)
+                {
+                    logerr($"Error opening the SLD file: {sldFilePath}, {sldFile?.FileError.ErrorMessage}");
+                    return sldFile;
+                }
+                if (!(sldFile is ISequenceFileAccess))
+                {
+                    logerr($"SLD file was read but contents are invalid: '{sldFilePath}'");
+                    return null;
+                }
+
+                return sldFile;
+            }
+            else
+            {
+                log($"Could not create temporary SLD file: '{sldFileCopy}'");
+                return null;
+            }
+        } // ReadContentsOfSLDFile()
 
         // Just return a list of the RAW files in an SLD file. If fileNamesOnly, just return base names, not paths.
         // returns an empty list on errors
@@ -570,16 +685,12 @@ namespace MassSpecTrigger
         {
             List<string> rawFilePaths = new List<string>();
             // Initialize the SLD file reader
-            var sldFile = SequenceFileReaderFactory.ReadFile(sldFilePath);
-            if (sldFile is null || sldFile.IsError)
+            var sldFile = ReadContentsOfSLDFile(sldFilePath);
+            if (sldFile is null)
             {
-                logerr($"Error opening the SLD file: {sldFilePath}, {sldFile?.FileError.ErrorMessage}");
-                return rawFilePaths;
-            }
-            if (!(sldFile is ISequenceFileAccess))
-            {
-                Console.WriteLine($"This file {sldFilePath} does not support sequence file access.");
-                return rawFilePaths;
+                string errorMessage = $"Could not retrieve sequence from SLD file: '{sldFilePath}'";
+                logerr(errorMessage);
+                return null;
             }
             foreach (var sample in sldFile.Samples)
             {
@@ -597,7 +708,7 @@ namespace MassSpecTrigger
             }
             // According to docs, the SLD file is not kept open., saw no dispose
             return rawFilePaths;
-        }  // SLDReadSamples()
+        }  // GetSequenceFromSLD()
 
         // SLD / Keep track of acquired  logic starts here
         // returns an empty dictionary on errors
@@ -605,15 +716,13 @@ namespace MassSpecTrigger
         {
             StringOrderedDictionary rawFilesAcquired = new StringOrderedDictionary();
             // Initialize the SLD file reader
-            var sldFile = SequenceFileReaderFactory.ReadFile(sldFilePath);
+            // var sldFile = SequenceFileReaderFactory.ReadFile(sldFilePath);
+
+            // Read a copy of the SLD file
+            var sldFile = ReadContentsOfSLDFile(sldFilePath);
             if (sldFile is null || sldFile.IsError)
             {
                 logerr($"Error opening the SLD file: {sldFilePath}, {sldFile?.FileError.ErrorMessage}");
-                return rawFilesAcquired;
-            }
-            if (!(sldFile is ISequenceFileAccess))
-            {
-                Console.WriteLine($"This file {sldFilePath} does not support sequence file access.");
                 return rawFilesAcquired;
             }
             foreach (var sample in sldFile.Samples)
@@ -749,6 +858,144 @@ namespace MassSpecTrigger
             return acquired;
         }  // countRawFilesAcquired()
 
+        public static bool CheckForFailureFile(string destinationPath)
+        {
+            string msaFilePath = Path.Combine(destinationPath, FailureTokenFile);
+            if (Path.Exists(destinationPath))
+            {
+                if (Path.Exists(msaFilePath))
+                {
+                    log($"Failure trigger file already exists: '{msaFilePath}'");
+                    return true;
+                }
+                else
+                {
+                    log($"Failure trigger file does not already exist: '{msaFilePath}'");
+                    return false;
+                }
+            }
+            else
+            {
+                logerr($"Could not check for failure trigger file, directory does not exist: '{destinationPath}'");
+                return false;
+            }
+        } // CheckForFailureFile()
+
+        public static bool DeleteFailureFile(string destinationPath)
+        {
+            // Returns true if the failure trigger file is deleted or does not exist
+            string msaFilePath = Path.Combine(destinationPath, FailureTokenFile);
+            if (Path.Exists(destinationPath))
+            {
+                if (Path.Exists(msaFilePath))
+                {
+                    log($"Deleting failure trigger file: '{msaFilePath}'");
+                    File.Delete(msaFilePath);
+                } else {
+                    log($"Did not delete failure trigger file, file not found: '{msaFilePath}'");
+                }
+            }
+            else
+            {
+                log($"Error deleting failure trigger file, output directory not found: '{destinationPath}'");
+                return false;
+            }
+
+            if (CheckForFailureFile(destinationPath))
+            {
+                logwarn($"Error, failure trigger file could not be deleted: '{msaFilePath}'");
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        } // DeleteFailureFile()
+
+        public static bool CreateTriggerFileSuccess(string destinationPath, string rawFilePath)
+        {
+            // write MSAComplete.txt to The Final Destination
+            string ssRawFile = "raw_file=\"" + rawFilePath + "\"";
+            string isRepeatRun = "false";
+            if (ContainsCaseInsensitiveSubstring(destinationPath, RepeatRun) || ContainsCaseInsensitiveSubstring(rawFileName, RepeatRun))
+            {
+                isRepeatRun = "true";
+            }
+            string ssRepeat = "repeat_run=\"" + isRepeatRun + "\"";
+            string msaFilePath = Path.Combine(destinationPath, TokenFile);
+            string ssDate = Timestamp();
+            using (StreamWriter msaFile = new StreamWriter(msaFilePath))
+            {
+                msaFile.WriteLine(ssDate);
+                msaFile.WriteLine(ssRawFile);
+                msaFile.WriteLine(ssRepeat);
+            }
+            
+            // Check to see if failure trigger file exists. If so, delete it.
+            if (CheckForFailureFile(destinationPath))
+            {
+                string msaFailurePath = Path.Combine(destinationPath, FailureTokenFile);
+                log($"Deleting old failure trigger file: '{msaFailurePath}'");
+                if (DeleteFailureFile(destinationPath))
+                {
+                    log($"Successfully deleted old failure trigger file: '{msaFailurePath}'");
+                }
+                else
+                {
+                    logwarn($"Problem deleting old failure trigger file: '{msaFailurePath}'");
+                }
+            }
+            log($"Trigger file created: '{msaFilePath}'");
+            return true;
+        } // CreateTriggerFileSuccess()
+
+        public static bool CreateFailureTriggerFile(string destinationPath, string rawFilePath, string errorMessage)
+        {
+            log($"Got error '{errorMessage}', will create failure trigger file if required");
+
+            // write MSAFailure.txt to The Final Destination
+            string ssRawFile = "raw_file=\"" + rawFilePath + "\"";
+            string isRepeatRun = "false";
+            if (ContainsCaseInsensitiveSubstring(destinationPath, RepeatRun) || ContainsCaseInsensitiveSubstring(rawFileName, RepeatRun))
+            {
+                isRepeatRun = "true";
+            }
+            string ssRepeat = "repeat_run=\"" + isRepeatRun + "\"";
+            CreateOutputDirectory(destinationPath);
+            string msaFilePath = Path.Combine(destinationPath, FailureTokenFile);
+            string ssDate = Timestamp();
+            string ssError = "trigger_error=\"" + errorMessage + "\"";
+            using (StreamWriter msaFile = new StreamWriter(msaFilePath))
+            {
+                msaFile.WriteLine(ssDate);
+                msaFile.WriteLine(ssRawFile);
+                msaFile.WriteLine(ssRepeat);
+                msaFile.WriteLine(ssError);
+            }
+            log("Failure trigger file created: " + msaFilePath);
+            return true;
+        } // CreateTriggerFileFailure()
+
+        public static string GetWindowsVersion()
+        {
+            var v = Environment.OSVersion.Version;
+            return $"{v.Major}.{v.Minor}.{v.Build}";
+        }
+
+        public static void NotifyAboutError(string destinationPath, string rawFilePath, string errorMessage)
+        {
+            if (!CheckForFailureFile(destinationPath))
+            {
+                CreateFailureTriggerFile(destinationPath, rawFilePath, errorMessage);
+            }
+            else
+            {
+                string failureFile = Path.Combine(destinationPath, FailureTokenFile);
+                log($"Failure trigger file already exists: '{failureFile}");
+                log($"Not creating new failure trigger file for error: '{errorMessage}'");
+            }
+        }
+
         public static void Main(string[] args)
         {
             rawFileName = "";
@@ -777,11 +1024,35 @@ namespace MassSpecTrigger
             Console.Error.WriteLine(helpText);
         } // DisplayHelp()
 
+        public static void DisplayVersion()
+        {
+            var AppNameAndVersion = $"{AppName} v{AppVersion}".Pastel(Color.Cyan);
+            var winVer = GetWindowsVersion();
+            var SystemVersion = $"Windows {winVer}".Pastel(Color.Bisque);
+            var buildTimestamp = GetBuildTimestamp();
+            var ssBuildTime = $"Built: {buildTimestamp}".Pastel(Color.MediumSpringGreen);
+            Console.Error.WriteLine(AppNameAndVersion);
+            Console.Error.WriteLine(SystemVersion);
+            Console.Error.WriteLine(ssBuildTime);
+            new ToastContentBuilder()
+                .AddText("MassSpecTrigger Error")
+                .AddText("Error running MassSpecTrigger")
+                .Show();
+
+
+        }
+
         public static void Run(Options options, string[] args)
         {
             if (options.Debug)
             {
                 DebugMode = true;
+            }
+
+            if (options.Version)
+            {
+                DisplayVersion();
+                Environment.Exit(0);
             }
 
             if (!string.IsNullOrEmpty(options.Logfile))
@@ -837,6 +1108,7 @@ namespace MassSpecTrigger
                 ConfigMap = ReadAndParseConfigFile(logPath);
                 RepeatRun = ConfigMap.TryGetValue(RepeatRunKey, out string repeatRun) ? repeatRun : DefaultRepeatRun;
                 TokenFile = ConfigMap.TryGetValue(TokenFileKey, out string tokenFile) ? tokenFile : DefaultTokenFile;
+                FailureTokenFile = ConfigMap.TryGetValue(FailureTokenFileKey, out string failureTokenFile) ? failureTokenFile : DefaultFailureTokenFile;
                 SourceTrim = ConfigMap.TryGetValue(SourceTrimKey, out string sourceTrimPath) ? sourceTrimPath : DefaultSourceTrim;
                 SldStartsWith = ConfigMap.TryGetValue(SldStartsWithKey, out string sldStartsWith) ? sldStartsWith : DefaultSldStartsWith;
                 IgnorePostBlank = ConfigMap.GetValueOrDefault(IgnorePostBlankKey, DefaultIgnorePostBlank);
@@ -876,6 +1148,9 @@ namespace MassSpecTrigger
                     logwarn($"PostBlank files will not be ignored. This will cause an error if the PostBlank file is saved in a different directory");
                 }
                 // END SETUP
+                
+                // Determine final output path
+                string destinationPath = ConstructDestinationPath(folderPath, outputPath, SourceTrim);
 
                 // BEG SLD / Check acquired raw
                 string sldPath = folderPath;
@@ -941,13 +1216,17 @@ namespace MassSpecTrigger
                             }
                             else
                             {
-                                logerr($"Oldest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: \"{folderPath}\"");
+                                string errorMessage = $"Oldest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: \"{folderPath}\""; 
+                                logerr(errorMessage);
+                                NotifyAboutError(destinationPath, rawFileName, errorMessage);
                                 Environment.Exit(1);
                             }
                         }
                         else
                         {
-                            logerr($"Could not find single SLD file or determine earliest SLD file, please remove extra SLD files from: \"{folderPath}\"");
+                            string errorMessage = $"Could not find single SLD file or determine earliest SLD file, please check that one SLD file exists in directory: \"{folderPath}\"";
+                            logerr(errorMessage);
+                            NotifyAboutError(destinationPath, rawFileName, errorMessage);
                             Environment.Exit(1);
                         }
                     }
@@ -972,12 +1251,17 @@ namespace MassSpecTrigger
                 logdbg($"Acquisition status file: '{rawFilesAcquiredPath}'");
                 if (rawFilesAcquiredDict.Count == 0)
                 {
-                    logerr($"Acquisition status internal dictionary is empty. Check {sldFile} and {rawFilesAcquiredPath}");
+                    string errorMessage = $"Acquisition status internal dictionary is empty. Check {sldFile} and {rawFilesAcquiredPath}";
+                    logerr(errorMessage);
+                    NotifyAboutError(destinationPath, rawFileName, errorMessage);
                     Environment.Exit(1);
                 }
 
                 if (!UpdateRawFilesAcquiredDict(rawFileName, rawFilesAcquiredDict))
                 {
+                    string errorMessage = $"Could not update acquisition status file \"{rawFilesAcquiredPath}\" for sample \"{rawFileName}\", check \"{sldFile}\"";
+                    logerr(errorMessage);
+                    NotifyAboutError(destinationPath, rawFileName, errorMessage);
                     Environment.Exit(1);
                 }
                 log($"Updated acquisition status for RAW file {rawFileName}");
@@ -991,7 +1275,6 @@ namespace MassSpecTrigger
                 // BEG MOVE FOLDER
                 if (areAllRawFilesAcquired(rawFilesAcquiredDict))
                 {
-                    string destinationPath = ConstructDestinationPath(folderPath, outputPath, SourceTrim);
                     log($"{acquired}/{total} raw files acquired, beginning payload activity ...");
                     if (!PrepareOutputDirectory(destinationPath, MinRawFileSize, RawFilePattern))
                     {
@@ -1014,23 +1297,19 @@ namespace MassSpecTrigger
                     // END MOVE FOLDER
                     
                     // write MSAComplete.txt to The Final Destination
-                    string ssRawFile = "raw_file=\"" + rawFileName + "\"";
-                    string isRepeatRun = "false";
-                    if (ContainsCaseInsensitiveSubstring(destinationPath, RepeatRun) || ContainsCaseInsensitiveSubstring(rawFileName, RepeatRun))
+                    if (CreateTriggerFileSuccess(destinationPath, rawFileName))
                     {
-                        isRepeatRun = "true";
+                        log("Processing completed successfully");
+                        Environment.Exit(0);
                     }
-                    string ssRepeat = "repeat_run=\"" + isRepeatRun + "\"";
-                    string msaFilePath = Path.Combine(destinationPath, TokenFile);
-                    string ssDate = Timestamp();
-                    using (StreamWriter msaFile = new StreamWriter(msaFilePath))
+                    else
                     {
-                        msaFile.WriteLine(ssDate);
-                        msaFile.WriteLine(ssRawFile);
-                        msaFile.WriteLine(ssRepeat);
+                        string msaFile = Path.Combine(destinationPath, TokenFile);
+                        string errorMessage = $"Could not save trigger file '{msaFile}'";
+                        logerr(errorMessage);
+                        NotifyAboutError(destinationPath, rawFileName, errorMessage);
+                        Environment.Exit(1);
                     }
-                    log("Wrote trigger file: " + msaFilePath);
-                    Environment.Exit(0);
                 }
                 else
                 {
