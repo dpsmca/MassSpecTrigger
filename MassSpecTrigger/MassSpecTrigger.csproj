@@ -1,7 +1,8 @@
-∩╗┐<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
+    <AssemblyVersion>4.10.0</AssemblyVersion>
+    <TargetFramework>net7.0-windows10.0.17763.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>10.0</LangVersion>
     <PublishUrl>publish\</PublishUrl>
@@ -22,12 +23,11 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
   </PropertyGroup>
@@ -42,22 +42,11 @@
   <PropertyGroup>
     <StartupObject>MassSpecTrigger.MainClass</StartupObject>
   </PropertyGroup>
-  <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <!--  <ItemGroup>
-    <Reference Include="System.Net" />
-    <Reference Include="netstandard" />
-  </ItemGroup>
-  -->
   <Target Name="GenerateBuildTimestamp" BeforeTargets="BeforeBuild">
 <!--    <Exec Command="dotnet my-tool" />-->
-    <Exec Command="powershell -noprofile -file ../getdate.ps1 > Resources/BuildTimestamp.txt" />
+    <Exec Command="powershell -noprofile -file ../getdate.ps1 &gt; Resources/BuildTimestamp.txt" />
     <ItemGroup>
-      <Compile Include="**/*$(DefaultLanguageSourceExtension)"
-               Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder);$(BaseIntermediateOutputPath)**;$(BaseOutputPath)**;@(Compile)" />
+      <Compile Include="**/*$(DefaultLanguageSourceExtension)" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder);$(BaseIntermediateOutputPath)**;$(BaseOutputPath)**;@(Compile)" />
     </ItemGroup>
   </Target>
   <ItemGroup>
@@ -71,6 +60,7 @@
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
     <PackageReference Include="NUnit" Version="3.13.3" />
     <PackageReference Include="OpenMcdf">
       <Version>2.3.0</Version>
