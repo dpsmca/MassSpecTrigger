@@ -999,8 +999,15 @@ namespace MassSpecTrigger
             string ssRepeat = "repeat_run=\"" + isRepeatRun + "\"";
             CreateOutputDirectory(destinationPath);
             string msaFilePath = Path.Combine(destinationPath, FailureTokenFile);
-            string ssDate = Timestamp();
-            string ssError = "trigger_error=\"" + errorMessage + "\"";
+
+            string safeError = errorMessage; 
+            if (errorMessage.Contains(@"\") && !errorMessage.Contains(@"\\"))
+            {
+                // We want backslashes doubled, but only if they're single
+                string pattern = @"(?<!\\)\\(?!\\)";
+                safeError = Regex.Replace(errorMessage, pattern, @"\\"); 
+            }
+            string ssError = "trigger_error=\"" + safeError + "\"";
             using (StreamWriter msaFile = new StreamWriter(msaFilePath))
             {
                 msaFile.WriteLine(ssDate);
