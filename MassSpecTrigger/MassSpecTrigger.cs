@@ -293,6 +293,8 @@ namespace MassSpecTrigger
         private const string RAW_FILES_ACQUIRED_BASE = "RawFilesAcquired.txt";
         public static string SLD_FILE_PATH = "";
         public static string rawFileName = "";
+        public static string resourceFolderPath = "";
+        public static string logFolderPath = "";
         public static string logFilePath = "";
         public static List<string> mockSequence = new List<string>();
         public static List<string> tempDirectories = new List<string>();
@@ -649,24 +651,54 @@ namespace MassSpecTrigger
 
         private static ISequenceFileAccess ReadContentsOfSLDFile(string sldFilePath)
         {
-            // Creates a copy of the SLD file in a temp directory before reading it
-            var sldTempDir = CreateSLDTempDirectory();
-            var sldFileName = Path.GetFileName(sldFilePath);
-            var sldFileCopy = Path.Combine(sldTempDir, sldFileName);
-            log($"Copying temp copy of SLD file: '{sldFilePath}' => '{sldFileCopy}'");
-            File.Copy(sldFilePath, sldFileCopy);
+            string sldFileCopy = sldFilePath;
+            var sldFileInfo = new FileInfo(sldFilePath);
+            if (!Path.Exists(sldFilePath))
+            {
+                var errorMessage = $"SLD file could not be read, file not found: '{sldFilePath}'";
+                logerr(errorMessage);
+                ShowErrorNotification("MassSpecTrigger Error", errorMessage);
+                Environment.Exit(1);
+            }
+            var sldFileName = sldFileInfo.Name;
+            var sldFileSize = sldFileInfo.Length;
+            // Check for a current temporary copy of the SLD file
+            if (tempDirectories is not null && tempDirectories.Count > 0)
+            {
+                string tempSldFile = "";
+                foreach (var tempDir in tempDirectories)
+                {
+                    var tempDirFiles = Directory.EnumerateFiles(tempDir, "*", SearchOption.TopDirectoryOnly)
+                        .Select(fp => new FileInfo(fp))
+                        .Where(fi => fi.Name == sldFileName && fi.Length == sldFileSize).ToList();
+                    if (tempDirFiles.Count == 1)
+                    {
+                        log($"Found existing temp copy of '{sldFilePath}', reading from copy");
+                        sldFileCopy = tempDirFiles.First().FullName;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Creates a copy of the SLD file in a temp directory before reading it
+                var sldTempDir = CreateSLDTempDirectory();
+                sldFileCopy = Path.Combine(sldTempDir, sldFileName);
+                log($"Making temp copy of SLD file: '{sldFilePath}' => '{sldFileCopy}'");
+                File.Copy(sldFilePath, sldFileCopy);
+            }
             if (Path.Exists(sldFileCopy))
             {
-                log($"Temporary SLD file created: '{sldFileCopy}'");
+                log($"Reading SLD file copy: '{sldFileCopy}'");
                 var sldFile = SequenceFileReaderFactory.ReadFile(sldFileCopy);
                 if (sldFile is null || sldFile.IsError)
                 {
-                    logerr($"Error opening the SLD file: {sldFilePath}, {sldFile?.FileError.ErrorMessage}");
+                    logerr($"Error opening the SLD file copy: {sldFileCopy}, {sldFile?.FileError.ErrorMessage}");
                     return sldFile;
                 }
                 if (!(sldFile is ISequenceFileAccess))
                 {
-                    logerr($"SLD file was read but contents are invalid: '{sldFilePath}'");
+                    logerr($"SLD file was read but contents are invalid: '{sldFileCopy}'");
                     return null;
                 }
 
@@ -1014,6 +1046,7 @@ namespace MassSpecTrigger
             if (!CheckForFailureFile(destinationPath))
             {
                 CreateFailureTriggerFile(destinationPath, rawFilePath, errorMessage);
+                ShowErrorNotification("MassSpecTrigger Error", errorMessage);
             }
             else
             {
@@ -1125,7 +1158,8 @@ namespace MassSpecTrigger
                 // Get the name of the current program (executable)
                 var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
                 string logPath = currentProcess.MainModule?.FileName;
-                string logFolderPath = Path.GetDirectoryName(logPath);
+                logFolderPath = Path.GetDirectoryName(logPath);
+                resourceFolderPath = logFolderPath;
                 if (string.IsNullOrEmpty(logFilePath))
                 {
                     logFilePath = Path.Combine(logFolderPath, TriggerLogFileStem + "." + TriggerLogFileExtension);
@@ -1144,11 +1178,13 @@ namespace MassSpecTrigger
                 string rawFileBaseName = Path.GetFileName(rawFilePath);
                 if (!File.Exists(rawFilePath))
                 {
-                    logerr($"{rawFileName} error: RAW file does not exist. Exiting.");
+                    var errorMessage = $"{rawFileName} error: RAW file does not exist. Exiting.";
+                    logerr(errorMessage);
+                    ShowErrorNotification("MassSpecTrigger Error", errorMessage);
                     Environment.Exit(1);
                 }
                 string folderPath = Path.GetDirectoryName(rawFilePath);
-                ConfigMap = ReadAndParseConfigFile(logPath);
+                ConfigMap = ReadAndParseConfigFile(exePath);
                 RepeatRun = ConfigMap.TryGetValue(RepeatRunKey, out string repeatRun) ? repeatRun : DefaultRepeatRun;
                 TokenFile = ConfigMap.TryGetValue(TokenFileKey, out string tokenFile) ? tokenFile : DefaultTokenFile;
                 FailureTokenFile = ConfigMap.TryGetValue(FailureTokenFileKey, out string failureTokenFile) ? failureTokenFile : DefaultFailureTokenFile;
@@ -1165,7 +1201,9 @@ namespace MassSpecTrigger
                 MinRawFileSize = ConfigMap.GetValueOrDefault(MinRawFileSizeKey, DefaultMinRawFileSize);
                 if (!ConfigMap.TryGetValue(OutputDirKey, out string outputPath))
                 {
-                    logerr("Missing key \"" + OutputDirKey + "\" in MassSpecTrigger configuration file. Exiting.");
+                    var errorMessage = "Missing key \"" + OutputDirKey + "\" in MassSpecTrigger configuration file. Exiting.";
+                    logerr(errorMessage);
+                    ShowErrorNotification("MassSpecTrigger Error", errorMessage);
                     Environment.Exit(1);
                 }
 
@@ -1318,7 +1356,9 @@ namespace MassSpecTrigger
                     log($"{acquired}/{total} raw files acquired, beginning payload activity ...");
                     if (!PrepareOutputDirectory(destinationPath, MinRawFileSize, RawFilePattern))
                     {
-                        logerr("Could not prepare destination: \"" + destinationPath + "\". Check this directory. Exiting.");
+                        var errorMessage = "Could not prepare destination: \"" + destinationPath + "\". Check this directory. Exiting.";
+                        logerr(errorMessage);
+                        ShowErrorNotification("MassSpecTrigger Error", errorMessage);
                         Environment.Exit(1);
                     }
                     log("Copying directory: \"" + folderPath + "\" => \"" + destinationPath + "\"");
