@@ -1036,8 +1036,14 @@ namespace MassSpecTrigger
                     .AddText(message);
                 if (File.Exists(imgLogoFullPath))
                 {
+                    logdbg($"Notification test: error image exists: '{imgUri}'");
                     notice.AddAppLogoOverride(imgUri);
                 }
+                else
+                {
+                    logdbg($"Notification test: no error image found at: '{imgUri}'");
+                }
+
                 notice.Show(toast =>
                 {
                     toast.ExpirationTime = DateTime.Now.AddDays(1);
