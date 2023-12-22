@@ -1253,59 +1253,103 @@ namespace MassSpecTrigger
 
                 // All items in the dictionary are kept in lower case to avoid dealing with case sensitive files and strings.
                 StringOrderedDictionary rawFilesAcquiredDict;
-                if (MockSequenceMode)
-                {
-                    log($"MOCK SEQUENCE MODE: mock sequence file contents are: [ {string.Join(", ", mockSequence)} ]");
-                    if (!File.Exists(rawFilesAcquiredPath))
-                    {
-                        logdbg($"Acquisition status file does not exist, creating: '{rawFilesAcquiredPath}'");
-                        rawFilesAcquiredDict = MockSLDReadSamples(rawFilesAcquiredPath, mockSequence);
-                    }
-                    else
-                    {
-                        logdbg($"Acquisition status file exists at: '{rawFilesAcquiredPath}'");
-                        rawFilesAcquiredDict = readRawFilesAcquired(rawFilesAcquiredPath);
-                    }
 
-                    sldFile = Path.Combine(sldPath, "MOCK_SLD_FILE.sld");
-                    SLD_FILE_PATH = sldFile;
-                    logdbg($"Acquisition status file: '{rawFilesAcquiredPath}'");
-                    logdbg($"Acquisition status file contents:\n{StringifyDictionary(rawFilesAcquiredDict)}'");
+                // We only need to read the SLD file once; after that, we use the
+                // acquisition status file. So let's see if it already exists.
+                logdbg($"Checking for Acquisition status file: '{rawFilesAcquiredPath}'");
+                if (File.Exists(rawFilesAcquiredPath))
+                {
+                    // Acquisition status file exists, no need to access SLD file
+                    logdbg($"Acquisition status file exists at: '{rawFilesAcquiredPath}'");
+                    rawFilesAcquiredDict = readRawFilesAcquired(rawFilesAcquiredPath);
                 }
                 else
                 {
-                    string[] sld_files;
-                    logdbg($"SLD FILES: path is {sldPath}, search pattern is {searchPattern}, and SLD extension is {sldExtension}");
-                    var all_files = Directory.GetFiles(sldPath, "*", SearchOption.TopDirectoryOnly);
-                    // var allFiles
-                    logdbg($"SLD FILES: directory \"{sldPath}\" contains files: [ {String.Join("; ", all_files)} ]");
-                    // ReSharper disable once InconsistentNaming
-                    var all_sld_files = all_files.Where(file => file.EndsWith(sldExtension, StringComparison.OrdinalIgnoreCase));
-                    var allSldFiles = all_sld_files.ToList();
-                    logdbg($"SLD FILES: files that end with '{sldExtension}': [ {String.Join("; ", allSldFiles)} ]");
-                    var good_sld_files = allSldFiles.Where(file => !IsTempSldFile(file) && Path.GetFileName(file).StartsWith(SldStartsWith)).ToList();
-                    sld_files = good_sld_files.ToArray();
-                    var sld_files_info = allSldFiles.Select(fp => new FileInfo(fp)).ToList();
-                    logdbg($"SLD FILES: directory \"{sldPath}\" contains {sld_files.Length} non-temp SLD files: [ {String.Join("; ", sld_files)} ]");
-                    if (sld_files.Length != 1)
+                    // Acquisition status file does not exist, so this is the first time
+                    // we've been called for this run directory. We need to determine the
+                    // list of RAW files in this sequence.
+                    logdbg($"Acquisition status file does not exist: '{rawFilesAcquiredPath}'");
+                    logdbg($"Looking for SLD file ...");
+                    
+                    // If we're in MockSequenceMode, use the provided list of RAW files instead of
+                    // trying to find an SLD file.
+                    if (MockSequenceMode)
                     {
-                        logwarn($"Problem finding SLD file: directory \"{sldPath}\" contains {sld_files.Length} matching SLD files ({SldStartsWith}*.sld), directory should contain a single matching SLD file.");
-                        var sorted_sld_files = sld_files_info.OrderBy(f => f.LastWriteTime).ToList();
-                        var earliest_sld_file = sorted_sld_files.First();
-                        if (earliest_sld_file is not null)
+                        log($"MOCK SEQUENCE MODE: mock sequence file contents are: [ {string.Join(", ", mockSequence)} ]");
+                        if (!File.Exists(rawFilesAcquiredPath))
                         {
-                            var earliest_sld_file_path = earliest_sld_file.FullName;
-                            List<string> sldRawFileNames = GetSequenceFromSLD(earliest_sld_file_path, true);
-                            List<string> sldRawFileLowercaseNames = sldRawFileNames.Select(f => f.ToLower()).ToList();
-                            if (sldRawFileLowercaseNames.Contains(rawFileBaseName.ToLower()))
+                            logdbg($"Acquisition status file does not exist, creating: '{rawFilesAcquiredPath}'");
+                            rawFilesAcquiredDict = MockSLDReadSamples(rawFilesAcquiredPath, mockSequence);
+                        }
+                        else
+                        {
+                            logdbg($"Acquisition status file exists at: '{rawFilesAcquiredPath}'");
+                            rawFilesAcquiredDict = readRawFilesAcquired(rawFilesAcquiredPath);
+                        }
+
+                        sldFile = Path.Combine(sldPath, "MOCK_SLD_FILE.sld");
+                        SLD_FILE_PATH = sldFile;
+                        logdbg($"Acquisition status file: '{rawFilesAcquiredPath}'");
+                        logdbg($"Acquisition status file contents:\n{StringifyDictionary(rawFilesAcquiredDict)}'");
+                    }
+                    else
+                    {
+                        // No acquisition status file and we're not running in MockSequenceMode.
+                        // Sigh. Now we need to find a good SLD file to use.
+                        string[] sld_files;
+                        logdbg($"SLD FILES: path is {sldPath}, search pattern is {searchPattern}, and SLD extension is {sldExtension}");
+                        var all_files = Directory.GetFiles(sldPath, "*", SearchOption.TopDirectoryOnly);
+                        // var allFiles
+                        logdbg($"SLD FILES: directory \"{sldPath}\" contains files: [ {String.Join("; ", all_files)} ]");
+                        // ReSharper disable once InconsistentNaming
+                        var all_sld_files = all_files.Where(file => file.EndsWith(sldExtension, StringComparison.OrdinalIgnoreCase));
+                        var allSldFiles = all_sld_files.ToList();
+                        logdbg($"SLD FILES: files that end with '{sldExtension}': [ {String.Join("; ", allSldFiles)} ]");
+                        var good_sld_files = allSldFiles.Where(file => !IsTempSldFile(file) && Path.GetFileName(file).StartsWith(SldStartsWith)).ToList();
+                        sld_files = good_sld_files.ToArray();
+                        logdbg($"SLD FILES: directory \"{sldPath}\" contains {sld_files.Length} non-temp SLD files: [ {String.Join("; ", sld_files)} ]");
+                        if (sld_files.Length == 0)
+                        {
+                            // There are no SLD files. Nothing we can do, just exit.
+                            var errorMessage = $"No SLD files found in directory: '{sldPath}'";
+                            logerr(errorMessage);
+                            NotifyAboutError(destinationPath, rawFilePath, errorMessage);
+                            Environment.Exit(1);
+                        }
+                        else if (sld_files.Length > 1)
+                        {
+                            // There are multiple SLD files. We will try to figure out the right one.
+                            logwarn($"Problem finding SLD file: directory '{sldPath}' contains {sld_files.Length} matching SLD files ({SldStartsWith}*.sld), directory should contain a single matching SLD file.");
+                            var sld_files_info = good_sld_files.Select(fp => new FileInfo(fp)).ToList();
+                            var sorted_sld_files = sld_files_info.OrderBy(f => f.LastWriteTime).ToList();
+                            FileInfo earliest_sld_file = null;
+                            if (sorted_sld_files.Count > 0)
                             {
-                                // We will try this SLD file.
-                                logwarn($"Oldest SLD file contains this RAW file's name, we will try using it: \"{earliest_sld_file_path}\"");
-                                sldFile = earliest_sld_file_path;
+                                earliest_sld_file = sorted_sld_files.First();
+                            }
+
+                            if (earliest_sld_file is not null)
+                            {
+                                var earliest_sld_file_path = earliest_sld_file.FullName;
+                                List<string> sldRawFileNames = GetSequenceFromSLD(earliest_sld_file_path, true);
+                                List<string> sldRawFileLowercaseNames = sldRawFileNames.Select(f => f.ToLower()).ToList();
+                                if (sldRawFileLowercaseNames.Contains(rawFileBaseName.ToLower()))
+                                {
+                                    // We will try this SLD file.
+                                    logwarn($"Earliest SLD file contains this RAW file's name, we will try using it: \"{earliest_sld_file_path}\"");
+                                    sldFile = earliest_sld_file_path;
+                                }
+                                else
+                                {
+                                    string errorMessage = $"Earliest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: '{folderPath}'";
+                                    logerr(errorMessage);
+                                    NotifyAboutError(destinationPath, rawFileName, errorMessage);
+                                    Environment.Exit(1);
+                                }
                             }
                             else
                             {
-                                string errorMessage = $"Oldest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: \"{folderPath}\""; 
+                                string errorMessage = $"Could not find required SLD file or use earliest SLD file, please check that one SLD file exists in directory: '{folderPath}'";
                                 logerr(errorMessage);
                                 NotifyAboutError(destinationPath, rawFileName, errorMessage);
                                 Environment.Exit(1);
@@ -1313,28 +1357,13 @@ namespace MassSpecTrigger
                         }
                         else
                         {
-                            string errorMessage = $"Could not find single SLD file or determine earliest SLD file, please check that one SLD file exists in directory: \"{folderPath}\"";
-                            logerr(errorMessage);
-                            NotifyAboutError(destinationPath, rawFileName, errorMessage);
-                            Environment.Exit(1);
+                            // Exactly one SLD file exists in the directory. Things are good!
+                            sldFile = sld_files[0];
                         }
-                    }
-                    else
-                    {
-                        sldFile = sld_files[0];
-                    }
-                    log($"Using SLD file: {sldFile}.");
-                    SLD_FILE_PATH = sldFile;
-                    // only need to read the SLD the first time in dir.
-                    if (!File.Exists(rawFilesAcquiredPath))
-                    {
-                        logdbg($"Acquisition status file does not exist, creating: '{rawFilesAcquiredPath}'");
+
+                        log($"Using SLD file: {sldFile}.");
+                        SLD_FILE_PATH = sldFile;
                         rawFilesAcquiredDict = SLDReadSamples(sldFile);
-                    }
-                    else
-                    {
-                        logdbg($"Acquisition status file exists at: '{rawFilesAcquiredPath}'");
-                        rawFilesAcquiredDict = readRawFilesAcquired(rawFilesAcquiredPath);
                     }
                 }
                 logdbg($"Acquisition status file: '{rawFilesAcquiredPath}'");
