@@ -107,7 +107,7 @@ namespace MassSpecTrigger
     // to avoid most casting
     public class StringKeyDictionary : OrderedDictionary, IEnumerable<KeyValuePair<string, object>>
     {
-        public new object this[string key]
+        public object this[string key]
         {
             get => base[key];
             set
@@ -123,7 +123,7 @@ namespace MassSpecTrigger
             base.Add(key, value);
         }
 
-        public new void Insert(int index, string key, object value)
+        public void Insert(int index, string key, object value)
         {
             ValidateValueType(value);
             base.Insert(index, key, value);
@@ -668,7 +668,6 @@ namespace MassSpecTrigger
             // Check for a current temporary copy of the SLD file
             if (tempDirectories is not null && tempDirectories.Count > 0)
             {
-                string tempSldFile = "";
                 foreach (var tempDir in tempDirectories)
                 {
                     var tempDirFiles = Directory.EnumerateFiles(tempDir, "*", SearchOption.TopDirectoryOnly)
