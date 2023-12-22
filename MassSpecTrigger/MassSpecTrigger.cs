@@ -82,10 +82,7 @@ namespace MassSpecTrigger
 
         [Option('d', "debug", Required = false, HelpText = "Enable debug output")]
         public bool Debug { get; set; }
-
-        [Option('v', "version", Required = false, HelpText = "Show version and exit")]
-        public bool Version { get; set; }
-
+        
         [Value(0, MetaName = "\"file_path.raw\"", HelpText = "RAW file (complete path)")]
         public string InputRawFile { get; set; } 
     }
@@ -1006,22 +1003,33 @@ namespace MassSpecTrigger
             parserResult = parser.ParseArguments<Options>(args);
             parserResult
                 .WithParsed<Options>(options => Run(options, args))
-                .WithNotParsed(errs => DisplayHelp(parserResult, errs));
+                .WithNotParsed<Options>(errs => DisplayHelp<Options>(parserResult, errs));
         } // Main()
 
-        public static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errors)
+        public static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
         {
-            var help = HelpText.RenderUsageText(result);
-            Console.WriteLine(help);
-            var helpText = HelpText.AutoBuild(result, h =>
+            HelpText helpText = null;
+            if (errs.IsVersion())
             {
-                h.AdditionalNewLineAfterOption = false;
-                h.MaximumDisplayWidth = 120;
-                h.Heading = $"{AppName} v{AppVersion}".Pastel(Color.Cyan);
-                h.Copyright = "Copyright 2023 Mayo Clinic";
-                return HelpText.DefaultParsingErrorsHandler(result, h);
-            }, e => e);
-            Console.Error.WriteLine(helpText);
+                // helpText = HelpText.AutoBuild(result);
+                DisplayVersion();
+                Environment.Exit(0);
+            }
+            else
+            {
+                var usage = HelpText.RenderUsageText(result);
+                helpText = HelpText.AutoBuild(result, h =>
+                {
+                    h.AdditionalNewLineAfterOption = true;
+                    h.MaximumDisplayWidth = 120;
+                    h.Heading = $"{AppName} v{AppVersion}".Pastel(Color.Cyan);
+                    h.Copyright = "Copyright 2023 Mayo Clinic";
+                    return HelpText.DefaultParsingErrorsHandler(result, h);
+                }, e => e);
+                Console.Error.WriteLine(usage);
+                Console.Error.WriteLine();
+                Console.Error.WriteLine(helpText);
+            }
         } // DisplayHelp()
 
         public static void DisplayVersion()
@@ -1031,15 +1039,10 @@ namespace MassSpecTrigger
             var SystemVersion = $"Windows {winVer}".Pastel(Color.Bisque);
             var buildTimestamp = GetBuildTimestamp();
             var ssBuildTime = $"Built: {buildTimestamp}".Pastel(Color.MediumSpringGreen);
+
             Console.Error.WriteLine(AppNameAndVersion);
             Console.Error.WriteLine(SystemVersion);
             Console.Error.WriteLine(ssBuildTime);
-            new ToastContentBuilder()
-                .AddText("MassSpecTrigger Error")
-                .AddText("Error running MassSpecTrigger")
-                .Show();
-
-
         }
 
         public static void Run(Options options, string[] args)
@@ -1062,7 +1065,9 @@ namespace MassSpecTrigger
 
             if (string.IsNullOrEmpty(options.InputRawFile))
             {
-                logerr("Please pass in the full path to a RAW file (using %R parameter in Xcalibur)");
+                var errMessage = "Please pass in the full path to a RAW file (using %R parameter in Xcalibur)";
+                logerr(errMessage);
+                ShowErrorNotification("MassSpecTrigger Error", errMessage);
                 Environment.Exit(1);
             }
             else
@@ -1095,8 +1100,11 @@ namespace MassSpecTrigger
 
                 var exePath = currentProcess.MainModule?.FileName;
                 log("");
-                log("=============================================");
-                log($"COMMAND: {exePath} {string.Join(" ", args)}");
+                log("");
+                log($"##############################################################");
+                log($"# COMMAND: {exePath} {string.Join(" ", args)}");
+                log($"##############################################################");
+                log("");
                 string rawFilePath = Path.GetFullPath(rawFileName);
                 string rawFileBaseName = Path.GetFileName(rawFilePath);
                 if (!File.Exists(rawFilePath))
@@ -1159,9 +1167,6 @@ namespace MassSpecTrigger
                 string sldFile = "";
                 string rawFilesAcquiredPath = Path.Combine(sldPath, RAW_FILES_ACQUIRED_BASE);
 
-                // string[] sld_files = Directory.GetFiles(sldPath, searchPattern, SearchOption.TopDirectoryOnly)
-                //     .Where(file => file.EndsWith(".sld", StringComparison.OrdinalIgnoreCase))
-                //     .ToArray();
                 // All items in the dictionary are kept in lower case to avoid dealing with case sensitive files and strings.
                 StringOrderedDictionary rawFilesAcquiredDict;
                 if (MockSequenceMode)
