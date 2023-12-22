@@ -80,6 +80,9 @@ namespace MassSpecTrigger
         [Option('l', "logfile", Required = false, MetaValue = "\"logfile\"", HelpText = "Complete path to log file")]
         public string Logfile { get; set; }
 
+        [Option('n', "notification", Required = false, HelpText = "Send a test error notification and exit")]
+        public bool TestNotifications { get; set; }
+
         [Option('d', "debug", Required = false, HelpText = "Enable debug output")]
         public bool Debug { get; set; }
         
@@ -979,6 +982,33 @@ namespace MassSpecTrigger
             return $"{v.Major}.{v.Minor}.{v.Build}";
         }
 
+        public static void ShowErrorNotification(string title, string message)
+        {
+            try
+            {
+                var imgLogoName = @"error.png";
+                var imgLogoFullPath = Path.Combine(resourceFolderPath, imgLogoName);
+                var imgUri = new Uri("file://" + imgLogoFullPath);
+                var notice = new ToastContentBuilder()
+                    .AddText(title)
+                    .AddText(message);
+                if (File.Exists(imgLogoFullPath))
+                {
+                    notice.AddAppLogoOverride(imgUri);
+                }
+                notice.Show(toast =>
+                {
+                    toast.ExpirationTime = DateTime.Now.AddDays(1);
+                });
+            }
+            catch (Exception e)
+            {
+                log($"Error displaying notification: '{e.Message}'");
+                log(e.StackTrace);
+            }
+
+        }
+
         public static void NotifyAboutError(string destinationPath, string rawFilePath, string errorMessage)
         {
             if (!CheckForFailureFile(destinationPath))
@@ -1052,9 +1082,14 @@ namespace MassSpecTrigger
                 DebugMode = true;
             }
 
-            if (options.Version)
+            if (options.TestNotifications)
             {
-                DisplayVersion();
+                var curProc = System.Diagnostics.Process.GetCurrentProcess();
+                string called = curProc.MainModule?.FileName;
+                resourceFolderPath = Path.GetDirectoryName(called);
+                var title = "MassSpecTrigger Testing";
+                var text = "Testing MassSpecTrigger notifications\nAnd a second line for the MassSpecTrigger notification";
+                ShowErrorNotification(title, text);
                 Environment.Exit(0);
             }
 
