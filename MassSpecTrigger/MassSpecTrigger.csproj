@@ -99,4 +99,14 @@
   <ItemGroup>
     <Folder Include="TestMassSpecTrigger\" />
   </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resources\error128.png" />
+    <EmbeddedResource Include="Resources\error128.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <None Remove="Resources\warning128.png" />
+    <EmbeddedResource Include="Resources\warning128.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>
