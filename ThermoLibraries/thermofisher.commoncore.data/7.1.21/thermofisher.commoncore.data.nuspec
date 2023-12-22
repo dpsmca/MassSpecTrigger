@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>ThermoFisher.CommonCore.Data</id>
+    <version>7.1.21</version>
+    <authors>ThermoFisher.CommonCore.Data</authors>
+    <description>Common data structues and shared logic (shared in common core DLLs)</description>
+    <copyright>Copyright © 1998 - 2023  Thermo Fisher Scientific, Inc</copyright>
+    <dependencies>
+      <group targetFramework="net5.0" />
+    </dependencies>
+  </metadata>
+</package>

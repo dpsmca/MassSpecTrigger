@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>ThermoFisher.CommonCore.BackgroundSubtraction</id>
+    <version>7.1.21</version>
+    <authors>ThermoFisher.CommonCore.BackgroundSubtraction</authors>
+    <description>Algorithms for spectrum averaging and background subtraction</description>
+    <copyright>Copyright © 1998 - 2023  Thermo Fisher Scientific, Inc</copyright>
+    <dependencies>
+      <group targetFramework="net5.0">
+        <dependency id="ThermoFisher.CommonCore.Data" version="7.1.21" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>ThermoFisher.CommonCore.MassPrecisionEstimator</id>
+    <version>7.1.21</version>
+    <authors>ThermoFisher.CommonCore.MassPrecisionEstimator</authors>
+    <description>Package Description</description>
+    <copyright>Copyright © 1998 - 2023  Thermo Fisher Scientific, Inc</copyright>
+    <dependencies>
+      <group targetFramework="net5.0">
+        <dependency id="ThermoFisher.CommonCore.Data" version="7.1.21" exclude="Build,Analyzers" />
+        <dependency id="ThermoFisher.CommonCore.RawFileReader" version="7.1.21" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
