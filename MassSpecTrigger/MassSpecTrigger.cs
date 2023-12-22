@@ -899,12 +899,12 @@ namespace MassSpecTrigger
             {
                 if (Path.Exists(msaFilePath))
                 {
-                    log($"Failure trigger file already exists: '{msaFilePath}'");
+                    logdbg($"Failure trigger file already exists: '{msaFilePath}'");
                     return true;
                 }
                 else
                 {
-                    log($"Failure trigger file does not already exist: '{msaFilePath}'");
+                    logdbg($"Failure trigger file does not already exist: '{msaFilePath}'");
                     return false;
                 }
             }
@@ -969,7 +969,6 @@ namespace MassSpecTrigger
             if (CheckForFailureFile(destinationPath))
             {
                 string msaFailurePath = Path.Combine(destinationPath, FailureTokenFile);
-                log($"Deleting old failure trigger file: '{msaFailurePath}'");
                 if (DeleteFailureFile(destinationPath))
                 {
                     log($"Successfully deleted old failure trigger file: '{msaFailurePath}'");
@@ -999,13 +998,8 @@ namespace MassSpecTrigger
             CreateOutputDirectory(destinationPath);
             string msaFilePath = Path.Combine(destinationPath, FailureTokenFile);
 
-            string safeError = errorMessage; 
-            if (errorMessage.Contains(@"\") && !errorMessage.Contains(@"\\"))
-            {
-                // We want backslashes doubled, but only if they're single
-                string pattern = @"(?<!\\)\\(?!\\)";
-                safeError = Regex.Replace(errorMessage, pattern, @"\\"); 
-            }
+            // Replace backslashes with forward slashes for compatibility with pipeline email function
+            string safeError = Regex.Replace(errorMessage, @"\\", @"/"); 
             string ssError = "trigger_error=\"" + safeError + "\"";
             using (StreamWriter msaFile = new StreamWriter(msaFilePath))
             {
