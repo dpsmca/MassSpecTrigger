@@ -386,6 +386,9 @@ namespace MassSpecTrigger
 
         public static string Timestamp() => Timestamp("yyyy-MM-dd HH:mm:ss");
 
+        public static string TriggerFileTimestamp() => Timestamp("yyyy_M_d_H_m_s");
+
+
         // public static DateTime GetBuildDate(Assembly assembly)
         // {
         //     var attribute = assembly.GetCustomAttribute<BuildDateAttribute>();
@@ -947,6 +950,7 @@ namespace MassSpecTrigger
         public static bool CreateTriggerFileSuccess(string destinationPath, string rawFilePath)
         {
             // write MSAComplete.txt to The Final Destination
+            string ssDate = "trigger_date=\"" + TriggerFileTimestamp() + "\"";
             string ssRawFile = "raw_file=\"" + rawFilePath + "\"";
             string isRepeatRun = "false";
             if (ContainsCaseInsensitiveSubstring(destinationPath, RepeatRun) || ContainsCaseInsensitiveSubstring(rawFileName, RepeatRun))
@@ -955,7 +959,6 @@ namespace MassSpecTrigger
             }
             string ssRepeat = "repeat_run=\"" + isRepeatRun + "\"";
             string msaFilePath = Path.Combine(destinationPath, TokenFile);
-            string ssDate = Timestamp();
             using (StreamWriter msaFile = new StreamWriter(msaFilePath))
             {
                 msaFile.WriteLine(ssDate);
@@ -986,6 +989,7 @@ namespace MassSpecTrigger
             log($"Got error '{errorMessage}', will create failure trigger file if required");
 
             // write MSAFailure.txt to The Final Destination
+            string ssDate = "trigger_date=\"" + TriggerFileTimestamp() + "\"";
             string ssRawFile = "raw_file=\"" + rawFilePath + "\"";
             string isRepeatRun = "false";
             if (ContainsCaseInsensitiveSubstring(destinationPath, RepeatRun) || ContainsCaseInsensitiveSubstring(rawFileName, RepeatRun))
