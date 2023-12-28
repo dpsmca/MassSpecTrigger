@@ -43,13 +43,12 @@
   <PropertyGroup>
     <StartupObject>MassSpecTrigger.MainClass</StartupObject>
   </PropertyGroup>
-  <Target Name="GenerateBuildTimestamp" BeforeTargets="BeforeBuild">
-<!--    <Exec Command="dotnet my-tool" />-->
-    <Exec Command="powershell -noprofile -file ../getdate.ps1 &gt; Resources/BuildTimestamp.txt" />
-    <ItemGroup>
-      <Compile Include="**/*$(DefaultLanguageSourceExtension)" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder);$(BaseIntermediateOutputPath)**;$(BaseOutputPath)**;@(Compile)" />
-    </ItemGroup>
-  </Target>
+<!--  <Target Name="GenerateBuildTimestamp" BeforeTargets="BeforeBuild">-->
+<!--    <Exec Command="powershell -noprofile -file ../getdate.ps1 &gt; Resources/BuildTimestamp.txt" />-->
+<!--    <ItemGroup>-->
+<!--      <Compile Include="**/*$(DefaultLanguageSourceExtension)" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder);$(BaseIntermediateOutputPath)**;$(BaseOutputPath)**;@(Compile)" />-->
+<!--    </ItemGroup>-->
+<!--  </Target>-->
   <ItemGroup>
     <None Update="LICENSE">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
