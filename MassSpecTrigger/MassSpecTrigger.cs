@@ -62,7 +62,7 @@ using System.Collections.Specialized;
 using System.Reflection;
 using System.Resources;
 using System.Globalization;
-using Microsoft.Toolkit.Uwp.Notifications;
+// using Microsoft.Toolkit.Uwp.Notifications;
 using ThermoFisher.CommonCore.Data.Business;
 using ThermoFisher.CommonCore.Data.Interfaces;
 using ThermoFisher.CommonCore.RawFileReader;
@@ -1023,25 +1023,25 @@ namespace MassSpecTrigger
             try
             {
                 var imgLogoName = @"error.png";
-                var imgLogoFullPath = Path.Combine(resourceFolderPath, imgLogoName);
-                var imgUri = new Uri("file://" + imgLogoFullPath);
-                var notice = new ToastContentBuilder()
-                    .AddText(title)
-                    .AddText(message);
-                if (File.Exists(imgLogoFullPath))
-                {
-                    logdbg($"Notification test: error image exists: '{imgUri}'");
-                    notice.AddAppLogoOverride(imgUri);
-                }
-                else
-                {
-                    logdbg($"Notification test: no error image found at: '{imgUri}'");
-                }
-
-                notice.Show(toast =>
-                {
-                    toast.ExpirationTime = DateTime.Now.AddDays(1);
-                });
+                // var imgLogoFullPath = Path.Combine(resourceFolderPath, imgLogoName);
+                // var imgUri = new Uri("file://" + imgLogoFullPath);
+                // var notice = new ToastContentBuilder()
+                //     .AddText(title)
+                //     .AddText(message);
+                // if (File.Exists(imgLogoFullPath))
+                // {
+                //     logdbg($"Notification test: error image exists: '{imgUri}'");
+                //     notice.AddAppLogoOverride(imgUri);
+                // }
+                // else
+                // {
+                //     logdbg($"Notification test: no error image found at: '{imgUri}'");
+                // }
+                //
+                // notice.Show(toast =>
+                // {
+                //     toast.ExpirationTime = DateTime.Now.AddDays(1);
+                // });
             }
             catch (Exception e)
             {
