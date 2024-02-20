@@ -1376,7 +1376,7 @@ namespace MassSpecTrigger
 
                 if (!UpdateRawFilesAcquiredDict(rawFileName, rawFilesAcquiredDict))
                 {
-                    string errorMessage = $"Could not update acquisition status file \"{rawFilesAcquiredPath}\" for sample \"{rawFileName}\", check \"{sldFile}\"";
+                    string errorMessage = $"Could not update acquisition status file '{rawFilesAcquiredPath}' for sample '{rawFileName}'";
                     logerr(errorMessage);
                     NotifyAboutError(destinationPath, rawFileName, errorMessage);
                     Environment.Exit(1);
