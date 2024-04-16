@@ -1318,29 +1318,30 @@ namespace MassSpecTrigger
                         else if (sld_files.Length > 1)
                         {
                             // There are multiple SLD files. We will try to figure out the right one.
+                            // We will select the most recent SLD file with the correct name pattern.
                             logwarn($"Problem finding SLD file: directory '{sldPath}' contains {sld_files.Length} matching SLD files ({SldStartsWith}*.sld), directory should contain a single matching SLD file.");
                             var sld_files_info = good_sld_files.Select(fp => new FileInfo(fp)).ToList();
                             var sorted_sld_files = sld_files_info.OrderBy(f => f.LastWriteTime).ToList();
-                            FileInfo earliest_sld_file = null;
+                            FileInfo sld_file_to_use = null;
                             if (sorted_sld_files.Count > 0)
                             {
-                                earliest_sld_file = sorted_sld_files.First();
+                                sld_file_to_use = sorted_sld_files.Last();
                             }
 
-                            if (earliest_sld_file is not null)
+                            if (sld_file_to_use is not null)
                             {
-                                var earliest_sld_file_path = earliest_sld_file.FullName;
-                                List<string> sldRawFileNames = GetSequenceFromSLD(earliest_sld_file_path, true);
+                                var sld_file_to_use_path = sld_file_to_use.FullName;
+                                List<string> sldRawFileNames = GetSequenceFromSLD(sld_file_to_use_path, true);
                                 List<string> sldRawFileLowercaseNames = sldRawFileNames.Select(f => f.ToLower()).ToList();
                                 if (sldRawFileLowercaseNames.Contains(rawFileBaseName.ToLower()))
                                 {
                                     // We will try this SLD file.
-                                    logwarn($"Earliest SLD file contains this RAW file's name, we will try using it: \"{earliest_sld_file_path}\"");
-                                    sldFile = earliest_sld_file_path;
+                                    logwarn($"Newest SLD file contains this RAW file's name, we will try using it: \"{sld_file_to_use_path}\"");
+                                    sldFile = sld_file_to_use_path;
                                 }
                                 else
                                 {
-                                    string errorMessage = $"Earliest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: '{folderPath}'";
+                                    string errorMessage = $"Newest SLD file does not contain this RAW file's name, cannot find SLD file to use, please remove extra SLD files from: '{folderPath}'";
                                     logerr(errorMessage);
                                     NotifyAboutError(destinationPath, rawFileName, errorMessage);
                                     Environment.Exit(1);
@@ -1348,7 +1349,7 @@ namespace MassSpecTrigger
                             }
                             else
                             {
-                                string errorMessage = $"Could not find required SLD file or use earliest SLD file, please check that one SLD file exists in directory: '{folderPath}'";
+                                string errorMessage = $"Could not find required SLD file or use newest SLD file, please check that one SLD file exists in directory: '{folderPath}'";
                                 logerr(errorMessage);
                                 NotifyAboutError(destinationPath, rawFileName, errorMessage);
                                 Environment.Exit(1);
